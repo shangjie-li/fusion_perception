@@ -1,0 +1,3 @@
+[submodule "modules/yolact"]
+	path = modules/yolact
+	url = git@github.com:shangjie-li/yolact.git
