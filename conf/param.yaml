@@ -20,16 +20,16 @@ dt:
   calibration_lidar_file:             calibration_lidar.yaml
   calibration_radar_file:             calibration_radar.yaml
   
-  display_image_raw:                  False
-  display_image_segmented:            False
-  display_lidar_projected:            False
+  display_image_raw:                  True
+  display_image_segmented:            True
+  display_lidar_projected:            True
   
-  display_2d_modeling:                False
-  display_gate:                       False
+  display_2d_modeling:                True
+  display_gate:                       True
   
-  display_3d_modeling:                False
-  display_frame:                      False
-  display_obj_state:                  False
+  display_3d_modeling:                True
+  display_frame:                      True
+  display_obj_state:                  True
   
   processing_mode: DT # D - detection, DT - detection and tracking
   

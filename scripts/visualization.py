@@ -276,7 +276,7 @@ def draw_object_model_from_main_view(img, objs, frame, display_frame=True,
     f_thickness = 1
     red = (0, 0, 255)
     if display_frame:
-        cv2.putText(img, str(frame), (10, 20), f_face, f_scale, red, f_thickness, cv2.LINE_AA)
+        cv2.putText(img, str(frame), (20, 40), f_face, f_scale, red, f_thickness, cv2.LINE_AA)
     
     return img
 
