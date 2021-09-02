@@ -1,0 +1,4 @@
+scripts/__pycache__
+scripts/*.mp4
+scripts/*.txt
+scripts/*.png

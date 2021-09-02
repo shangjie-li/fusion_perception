@@ -37,7 +37,6 @@ def create_random_color():
     b = random.randint(0, 255)
     
     color = (r, g, b)
-    
     return color
 
 def draw_mask(img, mask, color):
@@ -50,7 +49,7 @@ def draw_mask(img, mask, color):
     img_gpu = torch.from_numpy(img).cuda().float()
     img_gpu = img_gpu / 255.0
     
-    # 改变mask的维度 <class 'torch.Tensor'> torch.Size([480, 640, 1])
+    # 改变mask的维度 <class 'torch.Tensor'> torch.Size([frame_height, frame_width, 1])
     mask = mask[:, :, None]
     
     # color_tensor <class 'torch.Tensor'> torch.Size([3])
@@ -79,11 +78,11 @@ def draw_segmentation_result(img, mask, classname, score, box, color):
     
     font_face = cv2.FONT_HERSHEY_DUPLEX
     font_scale = 0.4
-    font_thickness = 1
+    font_thickness, line_thickness = 1, 2
     
     # 绘制矩形框
     x1, y1, x2, y2 = box[:]
-    cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), color, font_thickness)
+    cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), color, line_thickness)
     
     # 绘制掩膜
     img = draw_mask(img, mask, color)
@@ -140,7 +139,7 @@ class YolactDetector():
         #      items <class 'list'> 保留的目标类别
         #      score_thresholds <class 'list'> 与items中的类别对应的置信度阈值
         #      top_ks <class 'list'> 与items中的类别对应的数量阈值
-        # 输出：masks <class 'torch.Tensor'>  torch.Size([N, frame_height, frame_width]) N为目标数量
+        # 输出：masks <class 'torch.Tensor'> torch.Size([N, frame_height, frame_width]) N为目标数量
         #      classes <class 'numpy.ndarray'> (N,) N为目标数量
         #      scores <class 'numpy.ndarray'> (N,) N为目标数量
         #      boxes <class 'numpy.ndarray'> (N, 4) N为目标数量

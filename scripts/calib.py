@@ -5,12 +5,10 @@ import math
 import cv2
 
 class Calib:
-    def __init__(self, file_path, print_mat=True):
+    def __init__(self, file_path, print_mat=True, sensor_name='sensor'):
         fs = cv2.FileStorage(file_path, cv2.FileStorage_READ)
-        if(not fs.isOpened()):
-            print("No file: %s" %file_path)
         
-        tr_raw = fs.getNode('LidarToCameraMat').mat()
+        tr_raw = fs.getNode('SensorToCameraMat').mat()
         # x轴旋转矩阵(gamma) y轴旋转矩阵(beta) z轴旋转矩阵(alpha)
         gamma = fs.getNode('RotationAngleX').real() * math.pi / 180
         rx = np.array([[1, 0, 0, 0],
@@ -29,9 +27,10 @@ class Calib:
                        [0, 0, 0, 1],],np.float32)
         tr = rz.dot(ry.dot(rx.dot(tr_raw)))
         if print_mat:
-            print("transformation_lidar_to_camera:")
+            print('Transformation for %s to camera:' % (sensor_name))
             print(tr)
             print()
-        self.transformation_lidar_to_camera = tr
-        self.projection_l2i = fs.getNode('ProjectionMat').mat().dot(tr)
+        
+        self.transformation_sensor_to_camera = tr
+        self.projection_s2i = fs.getNode('ProjectionMat').mat().dot(tr)
         self.projection_c2i = fs.getNode('ProjectionMat').mat()

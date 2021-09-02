@@ -1,47 +1,42 @@
 dt:
   print_time:                         True
   print_objects_info:                 False
-  record_objects_info:                True
   record_time:                        True
+  record_objects_info:                True
+  
+  use_lidar:                          True
+  use_radar:                          True
+  
+  sensor_height:                      2.0 # meter
+  sensor_depression:                  0.0 # deg
+  rotation_lidar_to_front:            0.0 # deg
+  rotation_radar_to_front:            0.0 # deg
   
   sub_image_topic:                    /usb_cam/image_raw
-  sub_point_clouds_topic:             /pandar_points_no_ground
+  sub_lidar_topic:                    /lidar_points_no_ground
+  sub_radar_topic:                    /radar
   pub_marker_topic:                   /objects
-  pub_marker_tracked_topic:           /objects_tracked
-  calibration_file:                   head_camera.yaml
+  pub_obstacle_topic:                 /obstacles
+  frame_id:                           /pandar
+  
+  calibration_image_file:             calibration_image.yaml
+  calibration_lidar_file:             calibration_lidar.yaml
+  calibration_radar_file:             calibration_radar.yaml
   
   display_image_raw:                  False
   display_image_segmented:            False
-  display_point_clouds_raw:           False
-  display_point_clouds_projected:     False
   
-  display_segmentation_result:        False
-  display_fusion_result:              True
-  display_calibration_result:         False
+  display_lidar_projected:            False
+  display_radar_projected:            False
   
-  display_2d_modeling_result:         False
-  display_obj_pc:                     False
-  display_gate:                       False
+  display_2d_modeling:                False
+  display_gate:                       True
   
-  display_3d_modeling_result:         True
+  display_3d_modeling:                True
   display_frame:                      True
-  display_class:                      True
-  display_id:                         True
-  display_state:                      False
+  display_obj_state:                  True
   
-  processing_mode: 'DT' # D - detection, DT - detection and tracking
-  processing_object: 'both' # car, person, both
-  
-  pc_view_crop:                       True
-  area_number:                        1
-  fov_angle:                          100
-  
-  pc_range_crop:                      True
-  sensor_height:                      2.0
-  higher_limit:                       4.0
-  lower_limit:                        -4.0
-  min_distance:                       1.5
-  max_distance:                       50.0
+  processing_mode: DT # D - detection, DT - detection and tracking
   
   blind_update_limit:                 0
   frame_rate:                         10

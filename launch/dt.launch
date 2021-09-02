@@ -3,8 +3,8 @@
     <!--points_process-->
     <node pkg="points_process" type="points_process_node" name="points_process_node" output="screen">
         <param name="sub_topic" value="/pandar_points"/>
-        <param name="pub_topic" value="/pandar_points_processed"/>
-        <param name="crop_view_mode" value="false"/>
+        <param name="pub_topic" value="/lidar_points_processed"/>
+        <param name="crop_view_mode" value="true"/>
         <param name="crop_range_mode" value="true"/>
         <param name="downsample_mode" value="true"/>
         <param name="filter_mode" value="false"/>
@@ -12,8 +12,8 @@
         <param name="show_time" value="true"/>
         <param name="view_number" value="1"/>
         <param name="field_of_view" value="100"/>
-        <param name="sensor_height" value="2.0"/>
-        <param name="view_higher_limit" value="2.0"/>
+        <param name="sensor_height" value="4.0"/>
+        <param name="view_higher_limit" value="4.0"/>
         <param name="view_lower_limit" value="-4.0"/>
         <param name="min_distance" value="1.5"/>
         <param name="max_distance" value="50.0"/>
@@ -24,9 +24,9 @@
     
     <!--points_ground_filter-->
     <node pkg="points_ground_filter" type="points_ground_filter_node" name="points_ground_filter_node" output="screen">
-        <param name="sub_topic" value="/pandar_points_processed"/>
-        <param name="pub_ground_topic" value="/pandar_points_ground"/>
-        <param name="pub_no_ground_topic" value="/pandar_points_no_ground"/>
+        <param name="sub_topic" value="/lidar_points_processed"/>
+        <param name="pub_ground_topic" value="/lidar_points_ground"/>
+        <param name="pub_no_ground_topic" value="/lidar_points_no_ground"/>
         <param name="show_points_size" value="true"/>
         <param name="show_time" value="true"/>
         <param name="crop_range_mode" value="true"/>
@@ -34,7 +34,7 @@
         <param name="range_rear" value="50"/>
         <param name="range_left" value="15"/>
         <param name="range_right" value="15"/>
-        <param name="sensor_height" value="2.0"/>
+        <param name="sensor_height" value="4.0"/>
         <param name="seeds_distance_threshold" value="1.0"/>
         <param name="ground_distance_threshold" value="0.2"/>
         <param name="num_lpr" value="100"/>

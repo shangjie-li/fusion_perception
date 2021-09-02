@@ -1,15 +1,20 @@
 # -*- coding: UTF-8 -*-
 
+Items = ['person', 'car', 'truck', 'bus']
+Confs = [0.15, 0.65, 0.65, 0.65]
+Topks = [10, 10, 10, 10]
+
+BasicColor = (158, 158, 158)
+LidarColor = (255, 0, 0)
+RadarColor = (0, 255, 0)
+PriorColor = (0, 0, 255)
+
 class Object():
     def __init__(self):
         self.mask = None                 # <class 'torch.Tensor'> torch.Size([frame_height, frame_width])
         self.classname = None            # <class 'str'>
         self.score = None                # <class 'float'>
         self.box = None                  # <class 'numpy.ndarray'> (4,)
-        
-        self.xs = None                   # <class 'numpy.ndarray'> (n,)
-        self.ys = None                   # <class 'numpy.ndarray'> (n,)
-        self.zs = None                   # <class 'numpy.ndarray'> (n,)
         
         self.x0 = 0                      # <class 'float'>
         self.y0 = 0                      # <class 'float'>
@@ -18,10 +23,7 @@ class Object():
         self.w = 0                       # <class 'float'>
         self.h = 0                       # <class 'float'>
         self.phi = 0                     # <class 'float'> [0, pi)
-        self.has_orientation = False     # <class 'bool'>
         
-        self.xref = 0                    # <class 'float'>
-        self.yref = 0                    # <class 'float'>
         self.vx = 0                      # <class 'float'>
         self.vy = 0                      # <class 'float'>
         
@@ -31,14 +33,8 @@ class Object():
         self.tracker = None
         self.tracker_blind_update = 0
         
-        self.tracker_x0 = None
-        self.tracker_y0 = None
-        self.tracker_z0 = None
-        self.tracker_l = None
-        self.tracker_w = None
-        self.tracker_h = None
-        self.tracker_phi = None
-        
+        self.refined_by_lidar = False
+        self.refined_by_radar = False
         
 if __name__ == '__main__':
     obj = Object()

@@ -5,7 +5,7 @@ ProjectionMat: !!opencv-matrix
    cols: 4
    dt: d
    data: [461, 0, 333, 0, 0, 463, 184, 0, 0, 0, 1, 0]
-LidarToCameraMat: !!opencv-matrix
+SensorToCameraMat: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d
