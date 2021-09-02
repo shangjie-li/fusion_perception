@@ -30,21 +30,23 @@ from config import BasicColor
 from config import LidarColor
 from config import RadarColor
 from config import PriorColor
-from calib import Calib
+from calib_lidar import CalibLidar
+from calib_radar import CalibRadar
 
 from mono_estimator import MonoEstimator
 from yolact_detector import YolactDetector
 from yolact_detector import draw_segmentation_result
 from kalman_filter import KalmanFilter4D
 
+from project import project_xyz
 from fit_3d_model import fit_2d_obb_using_iterative_procedure
 from fit_3d_model import transform_2d_point_clouds
 from cluster import cluster_2d_point_clouds
-from project import project_xyz, project_xyzlwhp
 from numpy_pc2 import pointcloud2_to_xyz_array
-from numpy_mmw import mmw_to_xyzlwhp_array
+from numpy_mmw import mmw_to_xylwp_array
 
 from visualization import get_stamp
+from visualization import normalize_phi
 from visualization import publish_marker_msg
 from visualization import publish_obstacle_msg
 from visualization import draw_point_clouds_from_main_view
@@ -55,6 +57,31 @@ from visualization import draw_object_model_from_bev_view
 image_lock = threading.Lock()
 lidar_lock = threading.Lock()
 radar_lock = threading.Lock()
+
+def transform_sensor_point_clouds(xs, ys, depression, phi):
+    ys *= math.cos(depression)
+    xs, ys = transform_2d_point_clouds(xs, ys, phi, 0, 0)
+    return xs, ys
+
+def decode_objs(objs, depression, phi):
+    objs_decoded = []
+    num = len(objs)
+    for i in range(num):
+        obj = Object()
+        x0, y0 = objs[i].x0, objs[i].y0
+        x0, y0 = transform_2d_point_clouds(x0, y0, -phi, 0, 0)
+        y0 /= math.cos(depression)
+        
+        obj.classname = objs[i].classname
+        obj.x0, obj.y0, obj.z0 = x0, y0, 0.0
+        obj.l, obj.w, obj.h = objs[i].l, objs[i].w, objs[i].h
+        obj.phi = normalize_phi(objs[i].phi + phi)
+        obj.vx, obj.vy = objs[i].vx, objs[i].vy
+        
+        obj.number = objs[i].number
+        obj.color = objs[i].color
+        objs_decoded.append(obj)
+    return objs_decoded
 
 def estimate_by_monocular(mono, masks, classes, scores, boxes):
     objs = []
@@ -88,7 +115,6 @@ def estimate_by_monocular(mono, masks, classes, scores, boxes):
     return objs
 
 def fuse_lidar(objs, xyz, uv):
-    # 功能：点云与图像实例匹配
     # 输入：objs <class 'list'> 存储目标检测结果
     #      xyz <class 'numpy.ndarray'> (n, 4) 代表三维点云的齐次坐标[x, y, z, 1]，n为点的数量
     #      uv  <class 'numpy.ndarray'> (n, 2) 代表图像坐标[u, v]，n为点的数量
@@ -111,9 +137,10 @@ def fuse_lidar(objs, xyz, uv):
         if xs.shape[0] > 0:
             xsc, ysc, is_clustered = cluster_2d_point_clouds(xs, ys)
             if is_clustered:
-                ysc = ysc * math.cos(sensor_depression)
-                xsc, ysc = transform_2d_point_clouds(xsc, ysc, rotation_lidar_to_front, 0, 0)
+                xsc, ysc = transform_sensor_point_clouds(xsc, ysc,
+                    calib_lidar.depression, calib_lidar.angle_to_front)
                 x0, y0, l, w, phi, _, _, _ = fit_2d_obb_using_iterative_procedure(xsc, ysc)
+                phi = normalize_phi(phi)
                 
                 objs[i].color = LidarColor
                 objs[i].refined_by_lidar = True
@@ -127,38 +154,40 @@ def fuse_lidar(objs, xyz, uv):
                 elif name in Items[1:3]:
                     objs[i].l, objs[i].w, objs[i].h = l, w, 2.0
 
-def fuse_radar(objs, xyz, uv, lwhp):
-    # 功能：雷达点云与图像实例匹配
+def fuse_radar(objs, xy, lwp):
     # 输入：objs <class 'list'> 存储目标检测结果
-    #      xyz <class 'numpy.ndarray'> (n, 4) 代表三维雷达点云的齐次坐标[x, y, z, 1]，n为点的数量
-    #      uv  <class 'numpy.ndarray'> (n, 2) 代表图像坐标[u, v]，n为点的数量
+    #      xy <class 'numpy.ndarray'> (n, 2) 代表二维雷达点云的坐标，n为点的数量
+    #      lwp  <class 'numpy.ndarray'> (n, 3) 代表长宽和方向角
     
-    n = uv.shape[0]
-    if n == 0:
-        return
-    
-    objs_uv = []
+    n = xy.shape[0]
     num = len(objs)
+    
+    objs_xy = []
     for i in range(num):
-        u = (objs[i].box[0] + objs[i].box[2]) / 2
-        v = (objs[i].box[1] + objs[i].box[3]) / 2
-        objs_uv.append([u, v])
-    objs_uv = np.array(objs_uv)
-    objs_uv = np.expand_dims(obj_uv, axis=0).repeat(n, axis=0) # [n, num, 2]
+        x = objs[i].x0
+        y = objs[i].y0
+        objs_xy.append([x, y])
+    objs_xy = np.array(objs_xy)
+    objs_xy = np.expand_dims(objs_xy, axis=0).repeat(n, axis=0) # [n, num, 2]
     
-    r_uv = uv.copy()
-    r_uv = np.expand_dims(r_uv, axis=1).repeat(num, axis=1) # [n, num, 2]
+    xsc, ysc = transform_sensor_point_clouds(xy[:, 0], xy[:, 1],
+        calib_radar.depression, calib_radar.angle_to_front)
+    r_xy = np.vstack((xsc, ysc)).T
+    r_xy = np.expand_dims(r_xy, axis=1).repeat(num, axis=1) # [n, num, 2]
     
-    dis = (r_uv[:, :, 0] - objs_uv[:, :, 0]) ** 2 + (r_uv[:, :, 1] - objs_uv[:, :, 1]) ** 2 # [n, num]
+    dis = np.sqrt(
+        (r_xy[:, :, 0] - objs_xy[:, :, 0]) ** 2 + (r_xy[:, :, 1] - objs_xy[:, :, 1]) ** 2
+    ) # [n, num]
     best_objs_for_radar_dis = dis.min(axis=1) # [n]
     best_objs_for_radar_idx = dis.argmin(axis=1) # [n]
     
     for j in range(n):
         d = best_objs_for_radar_dis[j]
         i = best_objs_for_radar_idx[j]
-        if d < 100 ** 2:
-            x0, y0 = xyz[j, 0], xyz[j, 1]
-            l, w, h, phi = lwhp[j]
+        if d < 5:
+            x0, y0 = xsc[j], ysc[j]
+            l, w, phi = lwp[j]
+            phi = normalize_phi(phi)
             
             if objs[i].refined_by_lidar:
                 objs[i].color = PriorColor
@@ -282,7 +311,8 @@ def track(number, objs_tracked, objs_temp, objs_detected, blind_update_limit, fr
     for j in range(num):
         # 初始化卡尔曼滤波器，对目标进行跟踪
         objs_temp[j].tracker = KalmanFilter4D(
-            1 / frame_rate, objs_temp[j].x0, objs_temp[j].vx, objs_temp[j].y0, objs_temp[j].vy,
+            1 / frame_rate,
+            objs_temp[j].x0, objs_temp[j].vx, objs_temp[j].y0, objs_temp[j].vy,
             sigma_ax=1, sigma_ay=1, sigma_ox=0.1, sigma_oy=0.1, gate_threshold=400
         )
     
@@ -323,7 +353,7 @@ def lidar_callback(lidar):
 def radar_callback(radar):
     global radar_stamps, radar_frames
     stamp = time.time()
-    data = mmw_to_xyzlwhp_array(radar)
+    data = mmw_to_xylwp_array(radar)
     
     radar_lock.acquire()
     if len(radar_stamps) < 1:
@@ -358,7 +388,7 @@ def fusion_callback(event):
     if len(radar_frames) > 0:
         radar_stamp = radar_stamps[-1]
         radar_frame = radar_frames[-1].copy()
-        if time.time() - radar_stamp < 1.0:
+        if time.time() - radar_stamp < 1.0 and radar_frame.shape[0] != 0:
             radar_valid = True
         else:
             radar_stamps.pop(0)
@@ -377,7 +407,7 @@ def fusion_callback(event):
     image_lock.release()
     
     current_image = image_frame.copy()
-    current_image = current_image[:, :, ::-1] # to BGR
+    # current_image = current_image[:, :, ::-1] # to BGR
     
     # 实例分割与视觉估计
     time_segmentation_start = time.time()
@@ -397,9 +427,8 @@ def fusion_callback(event):
     # 融合radar
     time_radar_fusion_start = time.time()
     if radar_valid:
-        radar_mat = calib_radar.projection_s2i
-        radar_xyz, radar_uv, radar_lwhp = project_xyzlwhp(radar_frame, radar_mat, win_h, win_w)
-        fuse_radar(objs, radar_xyz, radar_uv, radar_lwhp)
+        radar_xy, radar_lwp = radar_frame[:, :2], radar_frame[:, 2:]
+        fuse_radar(objs, radar_xy, radar_lwp)
     time_radar_fusion = time.time() - time_radar_fusion_start
     
     # 目标跟踪
@@ -417,12 +446,22 @@ def fusion_callback(event):
     header.stamp = rospy.Time.now()
     
     if processing_mode == 'D':
-        publish_marker_msg(pub_marker, header, frame_rate, objs, random_number=True)
-        publish_obstacle_msg(pub_obstacle, header, frame_rate, objs, random_number=True)
+        if lidar_valid and align_to_lidar:
+            objs_decoded = decode_objs(objs,
+                calib_lidar.depression, calib_lidar.angle_to_front)
+        else:
+            objs_decoded = objs
+        publish_marker_msg(pub_marker, header, frame_rate, objs_decoded, random_number=True)
+        publish_obstacle_msg(pub_obstacle, header, frame_rate, objs_decoded, random_number=True)
     elif processing_mode == 'DT':
         objs = objs_tracked
-        publish_marker_msg(pub_marker, header, frame_rate, objs, random_number=False)
-        publish_obstacle_msg(pub_obstacle, header, frame_rate, objs, random_number=False)
+        if lidar_valid and align_to_lidar:
+            objs_decoded = decode_objs(objs,
+                calib_lidar.depression, calib_lidar.angle_to_front)
+        else:
+            objs_decoded = objs
+        publish_marker_msg(pub_marker, header, frame_rate, objs_decoded, random_number=False)
+        publish_obstacle_msg(pub_obstacle, header, frame_rate, objs_decoded, random_number=False)
     
     # 可视化
     time_display_start = time.time()
@@ -443,26 +482,23 @@ def fusion_callback(event):
         if lidar_valid:
             win_lidar_projected = draw_point_clouds_from_main_view(
                 win_lidar_projected, lidar_xyz[:, 0], lidar_xyz[:, 1], lidar_xyz[:, 2],
-                lidar_mat, use_jet=True, radius=2
-            )
-    if display_radar_projected:
-        win_radar_projected = current_image.copy()
-        if radar_valid:
-            win_radar_projected = draw_point_clouds_from_main_view(
-                win_radar_projected, radar_xyz[:, 0], radar_xyz[:, 1], radar_xyz[:, 2],
-                radar_mat, use_jet=False, color=RadarColor, radius=8
+                lidar_mat, use_jet=True, radius=4
             )
     if display_2d_modeling:
-        win_2d_modeling = np.ones((win_h, win_w, 3), dtype=np.uint8) * 255
+        win_2d_modeling = np.ones((win_h // 3, win_w // 3, 3), dtype=np.uint8) * 255
         if lidar_valid:
+            xsc, ysc = transform_sensor_point_clouds(lidar_xyz[:, 0], lidar_xyz[:, 1],
+                calib_lidar.depression, calib_lidar.angle_to_front)
             win_2d_modeling = draw_point_clouds_from_bev_view(
-                win_2d_modeling, lidar_xyz[:, 0], lidar_xyz[:, 1],
-                center_alignment=False, color=(158, 158, 158), radius=1
+                win_2d_modeling, xsc, ysc,
+                center_alignment=False, color=LidarColor, radius=1
             )
         if radar_valid:
+            xsc, ysc = transform_sensor_point_clouds(radar_xy[:, 0], radar_xy[:, 1],
+                calib_radar.depression, calib_radar.angle_to_front)
             win_2d_modeling = draw_point_clouds_from_bev_view(
-                win_2d_modeling, radar_xyz[:, 0], radar_xyz[:, 1],
-                center_alignment=False, color=RadarColor, radius=4
+                win_2d_modeling, xsc, ysc,
+                center_alignment=False, color=RadarColor, radius=8
             )
         win_2d_modeling = draw_object_model_from_bev_view(
             win_2d_modeling, objs, display_gate,
@@ -488,10 +524,6 @@ def fusion_callback(event):
         cv2.namedWindow("lidar_projected", cv2.WINDOW_NORMAL)
         cv2.imshow("lidar_projected", win_lidar_projected)
         v_lidar_projected.write(win_lidar_projected)
-    if display_radar_projected:
-        cv2.namedWindow("radar_projected", cv2.WINDOW_NORMAL)
-        cv2.imshow("radar_projected", win_radar_projected)
-        v_radar_projected.write(win_radar_projected)
     if display_2d_modeling:
         cv2.namedWindow("2d_modeling", cv2.WINDOW_NORMAL)
         cv2.imshow("2d_modeling", win_2d_modeling)
@@ -503,7 +535,7 @@ def fusion_callback(event):
     
     # 显示窗口时按Esc键终止程序
     display = [display_image_raw, display_image_segmented, display_lidar_projected,
-        display_radar_projected, display_2d_modeling, display_3d_modeling].count(True) > 0
+        display_2d_modeling, display_3d_modeling].count(True) > 0
     if display and cv2.waitKey(1) == 27:
         if display_image_raw:
             cv2.destroyWindow("image_raw")
@@ -517,10 +549,6 @@ def fusion_callback(event):
             cv2.destroyWindow("lidar_projected")
             v_lidar_projected.release()
             print("Save video of lidar_projected.")
-        if display_radar_projected:
-            cv2.destroyWindow("radar_projected")
-            v_radar_projected.release()
-            print("Save video of radar_projected.")
         if display_2d_modeling:
             cv2.destroyWindow("2d_modeling")
             v_2d_modeling.release()
@@ -555,7 +583,8 @@ def fusion_callback(event):
         num = len(objs)
         for j in range(num):
             n = objs[j].number if processing_mode == 'DT' else j
-            print('Object %d x0:%.2f y0:%.2f %s' % (n, objs[j].x0, objs[j].y0, objs[j].classname))
+            print('Object %d x0:%.2f y0:%.2f %s' % (
+                n, objs[j].x0, objs[j].y0, objs[j].classname))
         print()
     
     if record_time:
@@ -578,12 +607,15 @@ def fusion_callback(event):
         for j in range(num):
             n = objs[j].number if processing_mode == 'DT' else j
             with open(filename_objects_info, 'a') as fob:
-                content = 'stamp:%.3f frame:%d id:%d xref:%.3f vx:%.3f yref:%.3f vy:%.3f ' + \
+                content = 'stamp:%.3f frame:%d id:%d ' + \
+                    'xref:%.3f vx:%.3f yref:%.3f vy:%.3f ' + \
                     'x0:%.3f y0:%.3f z0:%.3f l:%.3f w:%.3f h:%.3f phi:%.3f'
                 fob.write(
                     content % (
-                    image_stamp, frame, n, objs[j].x0, objs[j].vx, objs[j].y0, objs[j].vy,
-                    objs[j].x0, objs[j].y0, objs[j].z0, objs[j].l, objs[j].w, objs[j].h, objs[j].phi)
+                    image_stamp, frame, n,
+                    objs[j].x0, objs[j].vx, objs[j].y0, objs[j].vy,
+                    objs[j].x0, objs[j].y0, objs[j].z0,
+                    objs[j].l, objs[j].w, objs[j].h, objs[j].phi)
                 )
                 fob.write('\n')
 
@@ -612,13 +644,6 @@ if __name__ == '__main__':
     use_lidar = rospy.get_param("~use_lidar")
     use_radar = rospy.get_param("~use_radar")
     
-    sensor_height = rospy.get_param("~sensor_height")
-    sensor_depression = rospy.get_param("~sensor_depression") * math.pi / 180.
-    if use_lidar:
-        rotation_lidar_to_front = rospy.get_param("~rotation_lidar_to_front") * math.pi / 180.
-    if use_radar:
-        rotation_radar_to_front = rospy.get_param("~rotation_radar_to_front") * math.pi / 180.
-    
     # 设置ROS消息名称
     sub_image_topic = rospy.get_param("~sub_image_topic")
     if use_lidar:
@@ -629,6 +654,7 @@ if __name__ == '__main__':
     pub_marker_topic = rospy.get_param("~pub_marker_topic")
     pub_obstacle_topic = rospy.get_param("~pub_obstacle_topic")
     frame_id = rospy.get_param("~frame_id")
+    align_to_lidar = rospy.get_param("~align_to_lidar")
     
     # 设置标定参数
     cwd = os.getcwd()
@@ -640,21 +666,21 @@ if __name__ == '__main__':
     f_path = cwd[:calib_pth_idx] + '/conf/' + calibration_image_file
     if not os.path.exists(f_path):
             raise ValueError("%s doesn't exist." % (f_path))
-    mono = MonoEstimator(f_path, sensor_height, sensor_depression, print_info=True)
+    mono = MonoEstimator(f_path, print_info=True)
     
     if use_lidar:
         calibration_lidar_file = rospy.get_param("~calibration_lidar_file")
         f_path = cwd[:calib_pth_idx] + '/conf/' + calibration_lidar_file
         if not os.path.exists(f_path):
             raise ValueError("%s doesn't exist." % (f_path))
-        calib_lidar = Calib(f_path, print_mat=True, sensor_name='lidar')
+        calib_lidar = CalibLidar(f_path, print_info=True)
     
     if use_radar:
         calibration_radar_file = rospy.get_param("~calibration_radar_file")
         f_path = cwd[:calib_pth_idx] + '/conf/' + calibration_radar_file
         if not os.path.exists(f_path):
             raise ValueError("%s doesn't exist." % (f_path))
-        calib_radar = Calib(f_path, print_mat=True, sensor_name='radar')
+        calib_radar = CalibRadar(f_path, print_info=True)
     
     # 初始化YolactDetector
     detector = YolactDetector()
@@ -662,7 +688,8 @@ if __name__ == '__main__':
     # 准备图像序列
     print('Waiting for topic...')
     image_stamps, image_frames = [], []
-    rospy.Subscriber(sub_image_topic, Image, image_callback, queue_size=1, buff_size=52428800)
+    rospy.Subscriber(sub_image_topic, Image, image_callback, queue_size=1,
+        buff_size=52428800)
     while len(image_stamps) < 30:
         time.sleep(1)
     
@@ -672,12 +699,14 @@ if __name__ == '__main__':
     # 准备激光雷达点云序列
     lidar_stamps, lidar_frames = [], []
     if use_lidar:
-        rospy.Subscriber(sub_lidar_topic, PointCloud2, lidar_callback, queue_size=1, buff_size=52428800)
+        rospy.Subscriber(sub_lidar_topic, PointCloud2, lidar_callback, queue_size=1,
+            buff_size=52428800)
     
     # 准备毫米波雷达序列
     radar_stamps, radar_frames = [], []
     if use_radar:
-        rospy.Subscriber(sub_radar_topic, MarkerArray, radar_callback, queue_size=1, buff_size=52428800)
+        rospy.Subscriber(sub_radar_topic, MarkerArray, radar_callback, queue_size=1,
+            buff_size=52428800)
     
     # 完成所需传感器数据序列
     print('  Done.\n')
@@ -696,16 +725,7 @@ if __name__ == '__main__':
     # 设置显示窗口
     display_image_raw = rospy.get_param("~display_image_raw")
     display_image_segmented = rospy.get_param("~display_image_segmented")
-    
-    if use_lidar:
-        display_lidar_projected = rospy.get_param("~display_lidar_projected")
-    else:
-        display_lidar_projected = False
-    
-    if use_radar:
-        display_radar_projected = rospy.get_param("~display_radar_projected")
-    else:
-        display_radar_projected = False
+    display_lidar_projected = rospy.get_param("~display_lidar_projected")
     
     display_2d_modeling = rospy.get_param("~display_2d_modeling")
     display_gate = rospy.get_param("~display_gate")
@@ -720,27 +740,28 @@ if __name__ == '__main__':
     if display_image_raw:
         v_path = 'image_raw.mp4'
         v_format = cv2.VideoWriter_fourcc(*"mp4v")
-        v_image_raw = cv2.VideoWriter(v_path, v_format, frame_rate, (win_w, win_h), True)
+        v_image_raw = cv2.VideoWriter(v_path, v_format, frame_rate,
+            (win_w, win_h), True)
     if display_image_segmented:
         v_path = 'image_segmented.mp4'
         v_format = cv2.VideoWriter_fourcc(*"mp4v")
-        v_image_segmented = cv2.VideoWriter(v_path, v_format, frame_rate, (win_w, win_h), True)
+        v_image_segmented = cv2.VideoWriter(v_path, v_format, frame_rate,
+            (win_w, win_h), True)
     if display_lidar_projected:
         v_path = 'lidar_projected.mp4'
         v_format = cv2.VideoWriter_fourcc(*"mp4v")
-        v_lidar_projected = cv2.VideoWriter(v_path, v_format, frame_rate, (win_w, win_h), True)
-    if display_radar_projected:
-        v_path = 'radar_projected.mp4'
-        v_format = cv2.VideoWriter_fourcc(*"mp4v")
-        v_radar_projected = cv2.VideoWriter(v_path, v_format, frame_rate, (win_w, win_h), True)
+        v_lidar_projected = cv2.VideoWriter(v_path, v_format, frame_rate,
+            (win_w, win_h), True)
     if display_2d_modeling:
         v_path = '2d_modeling.mp4'
         v_format = cv2.VideoWriter_fourcc(*"mp4v")
-        v_2d_modeling = cv2.VideoWriter(v_path, v_format, frame_rate, (win_w, win_h), True)
+        v_2d_modeling = cv2.VideoWriter(v_path, v_format, frame_rate,
+            (win_w // 3, win_h // 3), True)
     if display_3d_modeling:
         v_path = '3d_modeling.mp4'
         v_format = cv2.VideoWriter_fourcc(*"mp4v")
-        v_3d_modeling = cv2.VideoWriter(v_path, v_format, frame_rate, (win_w, win_h), True)
+        v_3d_modeling = cv2.VideoWriter(v_path, v_format, frame_rate,
+            (win_w, win_h), True)
     
     # 启动数据融合线程
     processing_mode = rospy.get_param("~processing_mode")

@@ -4,8 +4,8 @@ import numpy as np
 import math
 import cv2
 
-class Calib:
-    def __init__(self, file_path, print_mat=True, sensor_name='sensor'):
+class CalibLidar:
+    def __init__(self, file_path, print_info=True):
         fs = cv2.FileStorage(file_path, cv2.FileStorage_READ)
         
         tr_raw = fs.getNode('SensorToCameraMat').mat()
@@ -26,9 +26,15 @@ class Calib:
                        [0, 0, 1, 0],
                        [0, 0, 0, 1],],np.float32)
         tr = rz.dot(ry.dot(rx.dot(tr_raw)))
-        if print_mat:
-            print('Transformation for %s to camera:' % (sensor_name))
-            print(tr)
+        
+        self.angle_to_front = fs.getNode('RotationAngleToFront').real() * math.pi / 180.0
+        self.depression = fs.getNode('DepressionAngle').real() * math.pi / 180.0
+        
+        if print_info:
+            print('Calibration of lidar:')
+            print('  Transformation to camera:\n', tr)
+            print('  RotationAngleToFront: %.2frad' % self.angle_to_front)
+            print('  DepressionAngle: %.2frad' % self.depression)
             print()
         
         self.transformation_sensor_to_camera = tr

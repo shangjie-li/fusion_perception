@@ -42,6 +42,8 @@ ROS package for fusion perception (camera & lidar & radar)
       cols: 4
       dt: d
       data: [461, 0, 333, 0, 0, 463, 184, 0, 0, 0, 1, 0]
+   Height: 4.0
+   DepressionAngle: 15.0
    ```
  - 编写激光雷达标定参数`fusion_perception/conf/calibration_lidar.yaml`
    ```
@@ -60,24 +62,15 @@ ROS package for fusion perception (camera & lidar & radar)
    RotationAngleX: -1
    RotationAngleY: -1
    RotationAngleZ: 0
+   RotationAngleToFront: 90.0
+   DepressionAngle: 15.0
    ```
  - 编写毫米波雷达标定参数`fusion_perception/conf/calibration_radar.yaml`
    ```
    %YAML:1.0
    ---
-   ProjectionMat: !!opencv-matrix
-      rows: 3
-      cols: 4
-      dt: d
-      data: [461, 0, 333, 0, 0, 463, 184, 0, 0, 0, 1, 0]
-   SensorToCameraMat: !!opencv-matrix
-      rows: 4
-      cols: 4
-      dt: d
-      data: [0, -1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0, 0, 0, 1]
-   RotationAngleX: -1
-   RotationAngleY: -1
-   RotationAngleZ: 0
+   RotationAngleToFront: 90.0
+   DepressionAngle: 15.0
    ```
  - 在上述三个参数文件中
    ```
@@ -108,17 +101,14 @@ ROS package for fusion perception (camera & lidar & radar)
    use_lidar:                          True
    use_radar:                          True
   
-   sensor_height:                      2.0 # meter
-   sensor_depression:                  0.0 # deg
-   rotation_lidar_to_front:            0.0 # deg
-   rotation_radar_to_front:            0.0 # deg
-  
-   sub_image_topic:                    /usb_cam/image_raw
-   sub_lidar_topic:                    /lidar_points_no_ground
-   sub_radar_topic:                    /radar
+   sub_image_topic:                    /usb_cam/image_rect_color
+   sub_lidar_topic:                    /lidar_points_processed
+   sub_radar_topic:                    /mmw_marker
    pub_marker_topic:                   /objects
    pub_obstacle_topic:                 /obstacles
-   frame_id:                           /pandar
+   
+   frame_id:                           /laser_link
+   align_to_lidar:                     True
   
    calibration_image_file:             calibration_image.yaml
    calibration_lidar_file:             calibration_lidar.yaml
@@ -126,9 +116,7 @@ ROS package for fusion perception (camera & lidar & radar)
   
    display_image_raw:                  False
    display_image_segmented:            False
-  
    display_lidar_projected:            False
-   display_radar_projected:            False
   
    display_2d_modeling:                False
    display_gate:                       False
@@ -143,10 +131,6 @@ ROS package for fusion perception (camera & lidar & radar)
    frame_rate:                         10
    max_id:                             10000
    ```
-    - `sensor_height`为感知平台的高度，单位米。
-    - `sensor_depression`为感知平台的俯角，单位度。
-    - `rotation_lidar_to_front`为激光雷达X轴旋转至感知平台正前方的角度，单位度。
-    - `rotation_radar_to_front`为毫米波雷达X轴旋转至感知平台正前方的角度，单位度。
     - `sub_image_topic`指明订阅的图像话题。
     - `sub_lidar_topic`指明订阅的激光雷达话题。
     - `sub_radar_topic`指明订阅的毫米波雷达话题。

@@ -4,14 +4,16 @@ ProjectionMat: !!opencv-matrix
    rows: 3
    cols: 4
    dt: d
-   data: [461, 0, 333, 0, 0, 463, 184, 0, 0, 0, 1, 0]
+   data: [1753.18408203125, 0, 1034.195586571179, 0, 0, 1930.464599609375, 626.0232451929842, 0, 0, 0, 1, 0]
 SensorToCameraMat: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d
-   data: [0, -1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0, 0, 0, 1]
-RotationAngleX: -1
-RotationAngleY: -1
+   data: [-0.991309,0.131537,0.00227342, -0.08, -0.00941376,-0.0536876,-0.998513, -0.00126546,-0.131219,-0.989856,0.0544592, 0.0138697,0,0,0,1]
+RotationAngleX: 0
+RotationAngleY: 12.5
 RotationAngleZ: 0
+RotationAngleToFront: 90.0
+DepressionAngle: 15.0
 
 

@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 
 Items = ['person', 'car', 'truck', 'bus']
-Confs = [0.15, 0.65, 0.65, 0.65]
+Confs = [0.15, 0.25, 0.25, 0.25]
 Topks = [10, 10, 10, 10]
 
 BasicColor = (158, 158, 158)

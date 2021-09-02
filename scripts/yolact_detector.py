@@ -77,7 +77,7 @@ def draw_segmentation_result(img, mask, classname, score, box, color):
     # 输出：img <class 'numpy.ndarray'> (frame_height, frame_width, 3)
     
     font_face = cv2.FONT_HERSHEY_DUPLEX
-    font_scale = 0.4
+    font_scale = 1.0
     font_thickness, line_thickness = 1, 2
     
     # 绘制矩形框

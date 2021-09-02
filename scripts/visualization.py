@@ -13,6 +13,13 @@ from color import JetColor
 def get_stamp(header):
     return header.stamp.secs + 0.000000001 * header.stamp.nsecs
 
+def normalize_phi(phi):
+    while phi < 0:
+        phi += math.pi
+    while phi >= math.pi:
+        phi -= math.pi
+    return phi
+
 def publish_marker_msg(pub, header, frame_rate, objs, random_number=True):
     markerarray = MarkerArray()
     
@@ -122,8 +129,10 @@ def draw_point_clouds_from_main_view(img, xs, ys, zs, mat,
     #      mat <class 'numpy.ndarray'> (3, 4) 代表投影矩阵
     # 输出：img <class 'numpy.ndarray'> (frame_height, frame_width, 3)
     
-    # 建立三维点云的齐次坐标
     num = xs.shape[0]
+    if num == 0:
+        return img
+
     xyz = np.ones((num, 4))
     xyz[:, 0], xyz[:, 1], xyz[:, 2] = xs, ys, zs
     
@@ -157,6 +166,10 @@ def draw_point_clouds_from_bev_view(img, xs, ys,
     #      xs <class 'numpy.ndarray'> (n,) 代表X坐标
     #      ys <class 'numpy.ndarray'> (n,) 代表Y坐标
     # 输出：img <class 'numpy.ndarray'> (frame_height, frame_width, 3)
+    
+    num = xs.shape[0]
+    if num == 0:
+        return img
     
     xs = (xs * 10).astype(int)
     ys = (- ys * 10).astype(int)
@@ -201,7 +214,7 @@ def draw_object_info(img, classname, number, xref, yref, vx, vy, uv_1, uv_2, col
     u1, v1, u2, v2 = int(uv_1[0, 0]), int(uv_1[0, 1]), int(uv_2[0, 0]), int(uv_2[0, 1])
     
     f_face = cv2.FONT_HERSHEY_DUPLEX
-    f_scale = 0.4
+    f_scale = 1.0
     f_thickness = 1
     white = (255, 255, 255)
     
@@ -259,7 +272,7 @@ def draw_object_model_from_main_view(img, objs, frame, display_frame=True,
             display_state, objs[i].l, objs[i].w, objs[i].h, objs[i].phi)
     
     f_face = cv2.FONT_HERSHEY_DUPLEX
-    f_scale = 0.4
+    f_scale = 1.0
     f_thickness = 1
     red = (0, 0, 255)
     if display_frame:

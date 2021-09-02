@@ -7,17 +7,14 @@ dt:
   use_lidar:                          True
   use_radar:                          True
   
-  sensor_height:                      2.0 # meter
-  sensor_depression:                  0.0 # deg
-  rotation_lidar_to_front:            0.0 # deg
-  rotation_radar_to_front:            0.0 # deg
-  
-  sub_image_topic:                    /usb_cam/image_raw
-  sub_lidar_topic:                    /lidar_points_no_ground
-  sub_radar_topic:                    /radar
+  sub_image_topic:                    /usb_cam/image_rect_color
+  sub_lidar_topic:                    /lidar_points_processed
+  sub_radar_topic:                    /mmw_marker
   pub_marker_topic:                   /objects
   pub_obstacle_topic:                 /obstacles
-  frame_id:                           /pandar
+  
+  frame_id:                           /laser_link
+  align_to_lidar:                     True
   
   calibration_image_file:             calibration_image.yaml
   calibration_lidar_file:             calibration_lidar.yaml
@@ -25,16 +22,14 @@ dt:
   
   display_image_raw:                  False
   display_image_segmented:            False
-  
   display_lidar_projected:            False
-  display_radar_projected:            False
   
   display_2d_modeling:                False
-  display_gate:                       True
+  display_gate:                       False
   
-  display_3d_modeling:                True
-  display_frame:                      True
-  display_obj_state:                  True
+  display_3d_modeling:                False
+  display_frame:                      False
+  display_obj_state:                  False
   
   processing_mode: DT # D - detection, DT - detection and tracking
   
