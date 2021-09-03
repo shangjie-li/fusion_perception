@@ -85,7 +85,8 @@ def decode_objs(objs, depression, phi):
 
 def estimate_by_monocular(mono, masks, classes, scores, boxes):
     objs = []
-    u, v = (boxes[:, 0] + boxes[:, 2]) / 2, boxes[:, 3]
+    # u, v = (boxes[:, 0] + boxes[:, 2]) / 2, boxes[:, 3]
+    u, v = (boxes[:, 0] + boxes[:, 2]) / 2, (boxes[:, 1] + boxes[:, 3]) / 2
     num = classes.shape[0] if classes is not None else 0
     
     for i in range(num):
@@ -180,6 +181,8 @@ def fuse_radar(objs, xy, lwp):
     
     n = xy.shape[0]
     num = len(objs)
+    if n == 0 or num == 0:
+        return
     
     objs_xy = []
     for i in range(num):
