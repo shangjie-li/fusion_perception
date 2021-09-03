@@ -60,9 +60,9 @@ def publish_marker_msg(pub, header, frame_rate, objs, random_number=True):
         marker.scale.z = obj.h
     
         # 设置标记颜色，确保不透明度alpha不为0
-        marker.color.r = obj.color[0] / 255.0
+        marker.color.r = obj.color[2] / 255.0
         marker.color.g = obj.color[1] / 255.0
-        marker.color.b = obj.color[2] / 255.0
+        marker.color.b = obj.color[0] / 255.0
         marker.color.a = 0.75
         
         marker.lifetime = rospy.Duration(1 / frame_rate)

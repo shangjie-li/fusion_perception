@@ -119,13 +119,23 @@ def fuse_lidar(objs, xyz, uv):
     #      xyz <class 'numpy.ndarray'> (n, 4) 代表三维点云的齐次坐标[x, y, z, 1]，n为点的数量
     #      uv  <class 'numpy.ndarray'> (n, 2) 代表图像坐标[u, v]，n为点的数量
     
-    xyz_img = np.zeros((win_h, win_w, 3))
+    base_h = 240 if win_h > 240 else win_h
+    base_w = 320 if win_w > 320 else win_w
+    scale_h = float(win_h / base_h)
+    scale_w = float(win_w / base_w)
+    
+    s_uv = uv.copy()
+    s_uv[:, 0] /= scale_w
+    s_uv[:, 1] /= scale_h
+    xyz_img = np.zeros((base_h, base_w, 3))
     for pt in range(xyz.shape[0]):
-        xyz_img[int(uv[pt, 1]), int(uv[pt, 0])] = xyz[pt, :3]
+        xyz_img[int(s_uv[pt, 1]), int(s_uv[pt, 0])] = xyz[pt, :3]
     
     num = len(objs)
     for i in range(num):
         mask = objs[i].mask.byte().cpu().numpy()
+        mask = cv2.resize(mask, (base_w, base_h)) # cv2.resize(img, (width, height))
+        
         idxs = np.where(mask)
         xs_temp = xyz_img[idxs[0], idxs[1], 0]
         ys_temp = xyz_img[idxs[0], idxs[1], 1]
@@ -144,15 +154,24 @@ def fuse_lidar(objs, xyz, uv):
                 
                 objs[i].color = LidarColor
                 objs[i].refined_by_lidar = True
-                objs[i].x0, objs[i].y0, objs[i].phi = x0, y0, phi
                 
                 name = objs[i].classname
                 if name == Items[0]:
-                    objs[i].phi = 0.0
+                    objs[i].x0, objs[i].y0 = x0, y0
+                    
                 elif name == Items[3]:
+                    objs[i].x0, objs[i].y0 = x0, y0
+                    l = 3.0 if l < 3.0 else l
+                    w = 3.0 if w < 3.0 else w
                     objs[i].l, objs[i].w, objs[i].h = l, w, 3.0
+                    objs[i].phi = phi
+                    
                 elif name in Items[1:3]:
+                    objs[i].x0, objs[i].y0 = x0, y0
+                    l = 2.0 if l < 2.0 else l
+                    w = 2.0 if w < 2.0 else w
                     objs[i].l, objs[i].w, objs[i].h = l, w, 2.0
+                    objs[i].phi = phi
 
 def fuse_radar(objs, xy, lwp):
     # 输入：objs <class 'list'> 存储目标检测结果
@@ -195,15 +214,18 @@ def fuse_radar(objs, xy, lwp):
             else:
                 objs[i].color = RadarColor
                 objs[i].refined_by_lidar = True
-                objs[i].x0, objs[i].y0, objs[i].phi = x0, y0, phi
                 
                 name = objs[i].classname
                 if name == Items[0]:
-                    objs[i].phi = 0.0
+                    objs[i].x0, objs[i].y0 = x0, y0
                 elif name == Items[3]:
+                    objs[i].x0, objs[i].y0 = x0, y0
                     objs[i].l, objs[i].w, objs[i].h = l, w, 3.0
+                    objs[i].phi = phi
                 elif name in Items[1:3]:
+                    objs[i].x0, objs[i].y0 = x0, y0
                     objs[i].l, objs[i].w, objs[i].h = l, w, 2.0
+                    objs[i].phi = phi
 
 def track(number, objs_tracked, objs_temp, objs_detected, blind_update_limit, frame_rate):
     # 数据关联与跟踪
@@ -451,8 +473,10 @@ def fusion_callback(event):
                 calib_lidar.depression, calib_lidar.angle_to_front)
         else:
             objs_decoded = objs
-        publish_marker_msg(pub_marker, header, frame_rate, objs_decoded, random_number=True)
-        publish_obstacle_msg(pub_obstacle, header, frame_rate, objs_decoded, random_number=True)
+        publish_marker_msg(pub_marker, header, frame_rate, objs_decoded,
+            random_number=True)
+        publish_obstacle_msg(pub_obstacle, header, frame_rate, objs_decoded,
+            random_number=True)
     elif processing_mode == 'DT':
         objs = objs_tracked
         if lidar_valid and align_to_lidar:
@@ -460,8 +484,10 @@ def fusion_callback(event):
                 calib_lidar.depression, calib_lidar.angle_to_front)
         else:
             objs_decoded = objs
-        publish_marker_msg(pub_marker, header, frame_rate, objs_decoded, random_number=False)
-        publish_obstacle_msg(pub_obstacle, header, frame_rate, objs_decoded, random_number=False)
+        publish_marker_msg(pub_marker, header, frame_rate, objs_decoded,
+            random_number=False)
+        publish_obstacle_msg(pub_obstacle, header, frame_rate, objs_decoded,
+            random_number=False)
     
     # 可视化
     time_display_start = time.time()
@@ -485,7 +511,7 @@ def fusion_callback(event):
                 lidar_mat, use_jet=True, radius=4
             )
     if display_2d_modeling:
-        win_2d_modeling = np.ones((win_h // 3, win_w // 3, 3), dtype=np.uint8) * 255
+        win_2d_modeling = np.ones((480, 640, 3), dtype=np.uint8) * 255
         if lidar_valid:
             xsc, ysc = transform_sensor_point_clouds(lidar_xyz[:, 0], lidar_xyz[:, 1],
                 calib_lidar.depression, calib_lidar.angle_to_front)
@@ -498,12 +524,13 @@ def fusion_callback(event):
                 calib_radar.depression, calib_radar.angle_to_front)
             win_2d_modeling = draw_point_clouds_from_bev_view(
                 win_2d_modeling, xsc, ysc,
-                center_alignment=False, color=RadarColor, radius=8
+                center_alignment=False, color=RadarColor, radius=4
             )
         win_2d_modeling = draw_object_model_from_bev_view(
             win_2d_modeling, objs, display_gate,
             center_alignment=False, axis=True, thickness=2
         )
+        win_2d_modeling = cv2.resize(win_2d_modeling, (win_w, win_h))
     if display_3d_modeling:
         win_3d_modeling = current_image.copy()
         win_3d_modeling = draw_object_model_from_main_view(
@@ -756,7 +783,7 @@ if __name__ == '__main__':
         v_path = '2d_modeling.mp4'
         v_format = cv2.VideoWriter_fourcc(*"mp4v")
         v_2d_modeling = cv2.VideoWriter(v_path, v_format, frame_rate,
-            (win_w // 3, win_h // 3), True)
+            (win_w, win_h), True)
     if display_3d_modeling:
         v_path = '3d_modeling.mp4'
         v_format = cv2.VideoWriter_fourcc(*"mp4v")
