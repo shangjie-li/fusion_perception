@@ -25,20 +25,17 @@ class MonoEstimator():
             print('  DepressionAngle: %.2frad' % self.depression)
             print()
         
-    def uv_to_xyz(self, u, v):
+    def box_to_xyz(self, box, height):
         # 由图像坐标计算世界坐标
         # 世界坐标系的原点位于相机中心，XZ平面平行于地面，X指向相机右侧，Z指向相机前方
-        u = int(u)
-        v = int(v)
-        
-        fx, fy = self.fx, self.fy
-        u0, v0 = self.u0, self.v0
-        
-        h = self.height
-        t = self.depression
-        
-        z = (h * fy * cos(t) - h * (v - v0) * sin(t)) / (fy * sin(t) + (v - v0) * cos(t))
-        x = (z * (u - u0) * cos(t) + h * (u - u0) * sin(t)) / fx
-        y = h
-        
+        x1, y1, x2, y2 = box
+        u = (x1 + x2) / 2
+        v = (y1 + y2) / 2
+
+        if abs(y2 - y1) == 0:
+            return float('inf'), float('inf'), float('inf')
+
+        z = self.fy * height / abs(y2 - y1)
+        x = z * (u - self.u0) / self.fx
+        y = z * (v - self.v0) / self.fy
         return x, y, z

@@ -3,6 +3,7 @@
 Items = ['person', 'car', 'truck', 'bus']
 Confs = [0.15, 0.25, 0.25, 0.25]
 Topks = [10, 10, 10, 10]
+Heights = [1.8, 2.0, 3.5, 3.5]
 
 BasicColor = (158, 158, 158)
 LidarColor = (255, 0, 0)

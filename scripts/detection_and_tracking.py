@@ -26,6 +26,7 @@ from config import Confs
 from config import Topks
 from config import Object
 from config import Items
+from config import Heights
 from config import BasicColor
 from config import LidarColor
 from config import RadarColor
@@ -85,10 +86,11 @@ def decode_objs(objs, depression, phi):
 
 def estimate_by_monocular(mono, masks, classes, scores, boxes):
     objs = []
-    # u, v = (boxes[:, 0] + boxes[:, 2]) / 2, boxes[:, 3]
-    u, v = (boxes[:, 0] + boxes[:, 2]) / 2, (boxes[:, 1] + boxes[:, 3]) / 2
-    num = classes.shape[0] if classes is not None else 0
-    
+
+    if classes is None:
+        return objs
+
+    num = classes.shape[0]
     for i in range(num):
         obj = Object()
         obj.mask = masks[i].clone() # clone for tensor
@@ -96,7 +98,8 @@ def estimate_by_monocular(mono, masks, classes, scores, boxes):
         obj.score = scores[i]
         obj.box = boxes[i].copy() # copy for ndarray
         
-        x, y, z = mono.uv_to_xyz(u[i], v[i])
+        height = Heights[Items.index(obj.classname)]
+        x, y, z = mono.box_to_xyz(obj.box, height)
         obj.x0 = z
         obj.y0 = -x
         
